@@ -9,25 +9,24 @@ import (
 )
 
 func TestEncodeServices(t *testing.T) {
-	units := []systemd.UnitStatus{
+	input := []Service{
 		{
-			Name:        "zeta.service",
-			LoadState:   "loaded",
-			ActiveState: "inactive",
-			SubState:    "dead",
-			Description: "Zeta service",
+			Name:        "zeta.timer",
+			LoadStatus:  "loaded",
+			Active:      false,
+			Status:      "dead",
+			Description: "Zeta timer",
 		},
 		{
 			Name:        "alpha.service",
-			LoadState:   "loaded",
-			ActiveState: "active",
-			SubState:    "running",
+			LoadStatus:  "loaded",
+			Active:      true,
+			Status:      "running",
 			Description: "Alpha service",
 		},
-		{Name: "timer.timer", LoadState: "loaded"},
 	}
 
-	data, err := encodeServices(units)
+	data, err := encodeServices(input)
 	if err != nil {
 		t.Fatalf("encodeServices returned error: %v", err)
 	}
@@ -37,24 +36,8 @@ func TestEncodeServices(t *testing.T) {
 		t.Fatalf("invalid JSON returned: %v", err)
 	}
 
-	want := []Service{
-		{
-			Name:        "alpha.service",
-			LoadStatus:  "loaded",
-			Active:      true,
-			Status:      "running",
-			Description: "Alpha service",
-		},
-		{
-			Name:        "zeta.service",
-			LoadStatus:  "loaded",
-			Active:      false,
-			Status:      "dead",
-			Description: "Zeta service",
-		},
-	}
-	if !reflect.DeepEqual(services, want) {
-		t.Errorf("encodeServices() = %#v, want %#v", services, want)
+	if !reflect.DeepEqual(services, input) {
+		t.Errorf("encodeServices() = %#v, want %#v", services, input)
 	}
 }
 
@@ -63,7 +46,44 @@ func TestEncodeServicesEmptyList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encodeServices returned error: %v", err)
 	}
-	if data != "[]" {
-		t.Errorf("encodeServices(nil) = %s, want []", data)
+	if data != "null" {
+		t.Errorf("encodeServices(nil) = %s, want null", data)
+	}
+}
+
+func TestFilterServices(t *testing.T) {
+	units := []systemd.UnitStatus{
+		{Name: "zeta.service", LoadState: "loaded"},
+		{Name: "alpha.service", LoadState: "loaded"},
+		{Name: "timer.timer", LoadState: "loaded"},
+	}
+
+	tests := []struct {
+		name             string
+		selectedServices []string
+		want             []Service
+	}{
+		{
+			name:             "selected services",
+			selectedServices: []string{"zeta.service"},
+			want:             []Service{{Name: "zeta.service", LoadStatus: "loaded"}},
+		},
+		{
+			name:             "no selected services",
+			selectedServices: nil,
+			want: []Service{
+				{Name: "alpha.service", LoadStatus: "loaded"},
+				{Name: "zeta.service", LoadStatus: "loaded"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := filterServices(units, tt.selectedServices)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("filterServices() = %#v, want %#v", got, tt.want)
+			}
+		})
 	}
 }
