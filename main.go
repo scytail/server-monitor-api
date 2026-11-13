@@ -1,24 +1,22 @@
 package main
 
 import (
-	"context"
-	"fmt"
-	"os"
+	"flag"
+	"log"
+	"net"
+	"net/http"
+	"strconv"
 
+	"server-monitor-api/internal/api"
 	"server-monitor-api/internal/services"
 )
 
 func main() {
-	// Retrieve services
-	servicesJSON, err := services.ListServices(context.Background())
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "list services: %v\n", err)
-		os.Exit(1)
-	}
+	ip := flag.String("ip", "localhost", "IP address or host name to listen on")
+	port := flag.Int("port", 8765, "port to listen on")
+	flag.Parse()
 
-	// Output services
-	if _, writeErr := fmt.Fprintln(os.Stdout, servicesJSON); writeErr != nil {
-		fmt.Fprintf(os.Stderr, "write services: %v\n", writeErr)
-		os.Exit(1)
-	}
+	address := net.JoinHostPort(*ip, strconv.Itoa(*port))
+	log.Printf("API listening on %s", address)
+	log.Fatal(http.ListenAndServe(address, api.NewRouter(services.ListServices)))
 }
