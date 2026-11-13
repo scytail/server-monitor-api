@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -18,43 +17,45 @@ type Service struct {
 	Description string `json:"description"`
 }
 
-func ListServices(ctx context.Context) (string, error) {
+func ListServices(ctx context.Context) ([]Service, error) {
 	// connect to systemd
 	conn, err := systemd.NewSystemConnectionContext(ctx)
 	if err != nil {
-		return "[]", fmt.Errorf("connect to systemd: %w", err)
+		return nil, fmt.Errorf("connect to systemd: %w", err)
 	}
 	defer conn.Close()
 
 	// query all service units
 	units, err := conn.ListUnitsContext(ctx)
 	if err != nil {
-		return "[]", fmt.Errorf("query systemd units: %w", err)
+		return nil, fmt.Errorf("query systemd units: %w", err)
 	}
 
-	// filter service units
-	selectedServices := filterServices(units, nil)
-
-	// encode the services as JSON
-	return encodeServices(selectedServices)
+	// interpolate service units into a usable list
+	return convertToServiceList(units), nil
 }
 
-func filterServices(units []systemd.UnitStatus, selectedServices []string) []Service {
-	selected := make(map[string]struct{}, len(selectedServices))
-	for _, name := range selectedServices {
+func FilterServices(services []Service, names []string) []Service {
+	selected := make(map[string]struct{}, len(names))
+	for _, name := range names {
 		selected[name] = struct{}{}
 	}
 
+	filtered := make([]Service, 0, len(names))
+	for _, service := range services {
+		if _, ok := selected[service.Name]; ok {
+			filtered = append(filtered, service)
+		}
+	}
+
+	return filtered
+}
+
+func convertToServiceList(units []systemd.UnitStatus) []Service {
 	services := make([]Service, 0, len(units))
 	for _, unit := range units {
 		if !strings.HasSuffix(unit.Name, ".service") {
 			continue
-		}
-
-		if len(selectedServices) > 0 {
-			if _, ok := selected[unit.Name]; !ok {
-				continue
-			}
 		}
 
 		services = append(services, Service{
@@ -66,18 +67,10 @@ func filterServices(units []systemd.UnitStatus, selectedServices []string) []Ser
 		})
 	}
 
+	// Sort alphabetically
 	sort.Slice(services, func(i, j int) bool {
 		return services[i].Name < services[j].Name
 	})
 
 	return services
-}
-
-func encodeServices(services []Service) (string, error) {
-	data, err := json.Marshal(services)
-	if err != nil {
-		return "[]", fmt.Errorf("encode services as JSON: %w", err)
-	}
-
-	return string(data), nil
 }
