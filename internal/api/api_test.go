@@ -74,11 +74,12 @@ func TestRouterLogsRequests(t *testing.T) {
 	})
 
 	request := httptest.NewRequest(http.MethodPost, "/services", strings.NewReader("{"))
+	request.RemoteAddr = "203.0.113.8:54321"
 	response := httptest.NewRecorder()
 
 	NewRouter().ServeHTTP(response, request)
 
-	if !strings.Contains(output.String(), "API request: POST /services") {
-		t.Fatalf("log output = %q, want request method and path", output.String())
+	if !strings.Contains(output.String(), "API request from 203.0.113.8: POST /services") {
+		t.Fatalf("log output = %q, want request IP, method, and path", output.String())
 	}
 }

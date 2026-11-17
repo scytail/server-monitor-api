@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"net"
 	"net/http"
 
 	"server-monitor-api/internal/services"
@@ -18,7 +19,15 @@ func NewRouter() http.Handler {
 	mux.HandleFunc("GET /services", listServicesHandler)
 	mux.HandleFunc("POST /services", filterServicesHandler)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("API request: %s %s", r.Method, r.URL.Path)
+		clientIP := r.RemoteAddr
+		if host, _, err := net.SplitHostPort(clientIP); err == nil {
+			clientIP = host
+		}
+		if ip := net.ParseIP(clientIP); ip != nil {
+			log.Printf("API request from %s: %s %s", ip, r.Method, r.URL.Path)
+		} else {
+			log.Printf("API request: %s %s", r.Method, r.URL.Path)
+		}
 		mux.ServeHTTP(w, r)
 	})
 }
