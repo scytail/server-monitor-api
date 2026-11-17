@@ -17,7 +17,7 @@ type Service struct {
 	Description string `json:"description"`
 }
 
-func ListServices(ctx context.Context) ([]Service, error) {
+func GetAllServices(ctx context.Context) ([]Service, error) {
 	// connect to systemd
 	conn, err := systemd.NewSystemConnectionContext(ctx)
 	if err != nil {
@@ -25,13 +25,13 @@ func ListServices(ctx context.Context) ([]Service, error) {
 	}
 	defer conn.Close()
 
-	// query all service units
+	// query all systemd units
 	units, err := conn.ListUnitsContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("query systemd units: %w", err)
 	}
 
-	// interpolate service units into a usable list
+	// interpolate units into a usable list of services
 	return convertToServiceList(units), nil
 }
 
@@ -54,6 +54,7 @@ func FilterServices(services []Service, names []string) []Service {
 func convertToServiceList(units []systemd.UnitStatus) []Service {
 	services := make([]Service, 0, len(units))
 	for _, unit := range units {
+		// Skip anything that doesn't have a "service" suffix
 		if !strings.HasSuffix(unit.Name, ".service") {
 			continue
 		}

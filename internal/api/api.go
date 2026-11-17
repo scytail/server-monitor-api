@@ -11,45 +11,41 @@ import (
 	"server-monitor-api/internal/services"
 )
 
-type ServiceHandler func(context.Context) ([]services.Service, error)
+type ServiceController func(context.Context) ([]services.Service, error)
 
-func NewRouter(serviceController ServiceHandler) http.Handler {
+func NewRouter() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /services", listServicesHandler(serviceController))
-	mux.HandleFunc("POST /services", filterServicesHandler(serviceController))
+	mux.HandleFunc("GET /services", listServicesHandler)
+	mux.HandleFunc("POST /services", filterServicesHandler)
 	return mux
 }
 
-func listServicesHandler(serviceController ServiceHandler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		allServices, err := serviceController(r.Context())
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to list services")
-			log.Printf("list services: %v", err)
-			return
-		}
-
-		writeJSON(w, http.StatusOK, allServices)
+func listServicesHandler(w http.ResponseWriter, r *http.Request) {
+	allServices, err := services.GetAllServices(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list services")
+		log.Printf("list services: %v", err)
+		return
 	}
+
+	writeJSON(w, http.StatusOK, allServices)
 }
 
-func filterServicesHandler(serviceController ServiceHandler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var names []string
-		if err := decodeNames(r, &names); err != nil {
-			writeError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-
-		allServices, err := serviceController(r.Context())
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to list services")
-			log.Printf("list services: %v", err)
-			return
-		}
-
-		writeJSON(w, http.StatusOK, services.FilterServices(allServices, names))
+func filterServicesHandler(w http.ResponseWriter, r *http.Request) {
+	var names []string
+	if err := decodeNames(r, &names); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
 	}
+
+	allServices, err := services.GetAllServices(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list services")
+		log.Printf("list services: %v", err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, services.FilterServices(allServices, names))
 }
 
 func decodeNames(r *http.Request, names *[]string) error {
