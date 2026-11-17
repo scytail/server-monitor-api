@@ -17,7 +17,10 @@ func NewRouter() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /services", listServicesHandler)
 	mux.HandleFunc("POST /services", filterServicesHandler)
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("API request: %s %s", r.Method, r.URL.Path)
+		mux.ServeHTTP(w, r)
+	})
 }
 
 func listServicesHandler(w http.ResponseWriter, r *http.Request) {

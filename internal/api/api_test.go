@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -60,5 +62,23 @@ func TestRouterRejectsMalformedFilterPayloads(t *testing.T) {
 		if response.Header().Get("Content-Type") != "application/json" {
 			t.Fatalf("Content-Type = %q, want application/json", response.Header().Get("Content-Type"))
 		}
+	}
+}
+
+func TestRouterLogsRequests(t *testing.T) {
+	var output bytes.Buffer
+	previousOutput := log.Writer()
+	log.SetOutput(&output)
+	t.Cleanup(func() {
+		log.SetOutput(previousOutput)
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/services", strings.NewReader("{"))
+	response := httptest.NewRecorder()
+
+	NewRouter().ServeHTTP(response, request)
+
+	if !strings.Contains(output.String(), "API request: POST /services") {
+		t.Fatalf("log output = %q, want request method and path", output.String())
 	}
 }
