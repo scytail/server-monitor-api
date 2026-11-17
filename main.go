@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"server-monitor-api/internal/api"
-	"server-monitor-api/internal/services"
 )
 
 func main() {
@@ -18,5 +17,5 @@ func main() {
 
 	address := net.JoinHostPort(*ip, strconv.Itoa(*port))
 	log.Printf("API listening on %s", address)
-	log.Fatal(http.ListenAndServe(address, api.NewRouter(services.ListServices)))
+	log.Fatal(http.ListenAndServe(address, api.NewRouter()))
 }
