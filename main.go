@@ -7,7 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"server-monitor-api/internal/api"
+	"server-monitor-api/api"
+	"server-monitor-api/internal/security"
 )
 
 func main() {
@@ -15,7 +16,12 @@ func main() {
 	port := flag.Int("port", 8765, "port to listen on")
 	flag.Parse()
 
+	token, err := security.ReadAPIToken()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	address := net.JoinHostPort(*ip, strconv.Itoa(*port))
 	log.Printf("API listening on %s", address)
-	log.Fatal(http.ListenAndServe(address, api.NewRouter()))
+	log.Fatal(http.ListenAndServe(address, api.NewRouter(token)))
 }

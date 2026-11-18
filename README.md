@@ -23,10 +23,16 @@ go build ./...
 
 ## Run
 
-Start the API with the default host and port:
+Start the API with the default host and port. The API requires a token supplied
+through a credential file named `gomonitor-api-token`; systemd exposes
+credentials to the process through `CREDENTIALS_DIRECTORY`. 
+
+### Local Testing
+
+When testing locally, run the following command:
 
 ```bash
-go run .
+CREDENTIALS_DIRECTORY=/path/to/credentials/directory go run .
 ```
 
 The server listens on `localhost:8765` by default.
@@ -34,8 +40,27 @@ The server listens on `localhost:8765` by default.
 You can override the bind address and port:
 
 ```bash
-go run . -ip 0.0.0.0 -port 8080
+go run . -ip 127.0.0.1 -port 8080
 ```
+
+### Service Deployment
+
+For systemd deployment, configure
+`LoadCredential=gomonitor-api-token:/path/to/token-file/gomonitor-api-token`.
+Save this line underneath the [Service] section of the systemd unit.
+The file can be saved anywhere, but it is recommended to be saved in `etc/server-monitor-api/gomonitor-api-token`.
+The credential must contain a 32-byte URL-safe base64 token (43 characters,
+without padding). Generate one with:
+
+```bash
+python3 -c 'import secrets; print(secrets.token_urlsafe(32))' >> /path/to/token-file/gomonitor-api-token
+```
+
+Keep the source credential file private, and do not commit the token. The gitignore safely ignores testing files located in a `.test` folder, so for local development purposes, the token file can be stored in there. The
+service exits at startup if the credential is missing or malformed. Since the
+API currently listens on localhost by default and is intended for same-host
+clients, HTTPS is not configured. Do not bind to a non-loopback address until
+HTTPS is configured.
 
 ## Test
 
@@ -50,13 +75,16 @@ go test ./...
 ### List all services
 
 ```bash
-curl http://localhost:8765/services
+curl -H "Authorization: Bearer $API_TOKEN" http://localhost:8765/services
 ```
+
+If using the included bruno collection, make sure to update the `apiToken` variable to include the token generated and stored in the relevant file.
 
 ### Filter services by name
 
 ```bash
 curl -X POST http://localhost:8765/services \
+  -H "Authorization: Bearer $API_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '["ssh.service", "cron.service"]'
 ```
@@ -66,6 +94,6 @@ The request body must be a JSON array of exact systemd unit names. An empty arra
 ## Project layout
 
 - `main.go` starts the HTTP server
-- `internal/api` contains the HTTP handlers and JSON response logic
+- `api` contains the HTTP handlers and JSON response logic
 - `internal/services` contains the systemd integration and filtering logic
 - `docs/bruno` contains Bruno API request examples

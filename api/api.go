@@ -9,15 +9,17 @@ import (
 	"net"
 	"net/http"
 
+	"server-monitor-api/internal/security"
 	"server-monitor-api/internal/services"
 )
 
 type ServiceController func(context.Context) ([]services.Service, error)
 
-func NewRouter() http.Handler {
+func NewRouter(token string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /services", listServicesHandler)
 	mux.HandleFunc("POST /services", filterServicesHandler)
+	handler := security.RequireBearerToken(token, mux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		clientIP := r.RemoteAddr
 		if host, _, err := net.SplitHostPort(clientIP); err == nil {
@@ -28,7 +30,7 @@ func NewRouter() http.Handler {
 		} else {
 			log.Printf("API request: %s %s", r.Method, r.URL.Path)
 		}
-		mux.ServeHTTP(w, r)
+		handler.ServeHTTP(w, r)
 	})
 }
 

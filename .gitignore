@@ -14,3 +14,6 @@
 # Go workspace files
 go.work
 go.work.sum
+
+# testing encryption keys
+gomonitor-api-token
