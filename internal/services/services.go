@@ -1,8 +1,11 @@
 package services
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"os"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -17,7 +20,7 @@ type Service struct {
 	Description string `json:"description"`
 }
 
-func GetAllServices(ctx context.Context) ([]Service, error) {
+func GetAllServices(ctx context.Context, blacklist []string) ([]Service, error) {
 	// connect to systemd
 	conn, err := systemd.NewSystemConnectionContext(ctx)
 	if err != nil {
@@ -31,8 +34,11 @@ func GetAllServices(ctx context.Context) ([]Service, error) {
 		return nil, fmt.Errorf("query systemd units: %w", err)
 	}
 
-	// interpolate units into a usable list of services
-	return convertToServiceList(units), nil
+	return filterUnitServices(units, blacklist), nil
+}
+
+func filterUnitServices(units []systemd.UnitStatus, blacklist []string) []Service {
+	return FilterBlacklistedServices(convertToServiceList(units), blacklist)
 }
 
 func FilterServices(services []Service, names []string) []Service {
@@ -44,6 +50,61 @@ func FilterServices(services []Service, names []string) []Service {
 	filtered := make([]Service, 0, len(names))
 	for _, service := range services {
 		if _, ok := selected[service.Name]; ok {
+			filtered = append(filtered, service)
+		}
+	}
+
+	return filtered
+}
+
+func LoadBlacklist(path string) ([]string, bool, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, false, nil
+		}
+		return nil, false, fmt.Errorf("open blacklist file %q: %w", path, err)
+	}
+	defer file.Close()
+
+	var patterns []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		patterns = append(patterns, line)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, false, fmt.Errorf("read blacklist file %q: %w", path, err)
+	}
+
+	return patterns, true, nil
+}
+
+func FilterBlacklistedServices(services []Service, patterns []string) []Service {
+	matchers := make([]*regexp.Regexp, 0, len(patterns))
+	for _, pattern := range patterns {
+		pattern = strings.TrimSpace(pattern)
+		if pattern == "" {
+			continue
+		}
+
+		expression := "^" + strings.ReplaceAll(regexp.QuoteMeta(pattern), `\*`, ".*") + "$"
+		matchers = append(matchers, regexp.MustCompile(expression))
+	}
+
+	filtered := make([]Service, 0, len(services))
+	for _, service := range services {
+		blacklisted := false
+		for _, matcher := range matchers {
+			if matcher.MatchString(service.Name) {
+				blacklisted = true
+				break
+			}
+		}
+		if !blacklisted {
 			filtered = append(filtered, service)
 		}
 	}

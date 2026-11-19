@@ -20,6 +20,12 @@ characters, without padding). Generate one with:
 python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
 ```
 
+The blacklist is loaded at startup from
+`/etc/server-monitor-api/blacklist`; use `-blacklist-file /path/to/blacklist`
+to select another file. Put one exact service name or pattern per line; `*`
+matches any number of characters. Blank lines and lines beginning with `#` are
+ignored. A missing file is treated as an empty blacklist.
+
 In the deployed systemd unit, use
 `LoadCredential=gomonitor-api-token:/path/to/token-file`; systemd then sets
 `CREDENTIALS_DIRECTORY` for the service. Keep the source credential file

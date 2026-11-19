@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -13,12 +12,18 @@ import (
 	"server-monitor-api/internal/services"
 )
 
-type ServiceController func(context.Context) ([]services.Service, error)
+func NewRouter(token string, blacklist ...string) http.Handler {
+	return newRouter(token, blacklist)
+}
 
-func NewRouter(token string) http.Handler {
+func newRouter(token string, blacklist []string) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /services", listServicesHandler)
-	mux.HandleFunc("POST /services", filterServicesHandler)
+	mux.HandleFunc("GET /services", func(w http.ResponseWriter, r *http.Request) {
+		listServicesHandler(w, r, blacklist)
+	})
+	mux.HandleFunc("POST /services", func(w http.ResponseWriter, r *http.Request) {
+		filterServicesHandler(w, r, blacklist)
+	})
 	handler := security.RequireBearerToken(token, mux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		clientIP := r.RemoteAddr
@@ -34,8 +39,8 @@ func NewRouter(token string) http.Handler {
 	})
 }
 
-func listServicesHandler(w http.ResponseWriter, r *http.Request) {
-	allServices, err := services.GetAllServices(r.Context())
+func listServicesHandler(w http.ResponseWriter, r *http.Request, blacklist []string) {
+	allServices, err := services.GetAllServices(r.Context(), blacklist)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list services")
 		log.Printf("list services: %v", err)
@@ -45,14 +50,14 @@ func listServicesHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, allServices)
 }
 
-func filterServicesHandler(w http.ResponseWriter, r *http.Request) {
+func filterServicesHandler(w http.ResponseWriter, r *http.Request, blacklist []string) {
 	var names []string
 	if err := decodeNames(r, &names); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	allServices, err := services.GetAllServices(r.Context())
+	allServices, err := services.GetAllServices(r.Context(), blacklist)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list services")
 		log.Printf("list services: %v", err)
