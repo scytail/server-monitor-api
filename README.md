@@ -43,6 +43,20 @@ You can override the bind address and port:
 go run . -ip 127.0.0.1 -port 8080
 ```
 
+The blacklist is loaded at startup from
+`/etc/server-monitor-api/blacklist`. Override the location with
+`-blacklist-file`. Put one exact service name or wildcard pattern per line;
+`*` matches any number of characters, and blank lines and lines beginning
+with `#` are ignored:
+
+```bash
+go run . -blacklist-file /path/to/blacklist
+```
+
+Blacklisted services are excluded from `GET /services` and removed before the
+requested-name filtering performed by `POST /services`. If the file does not
+exist, the API starts with an empty blacklist.
+
 ### Service Deployment
 
 For systemd deployment, configure
