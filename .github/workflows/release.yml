@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish Linux releases
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run unit tests
+        run: go test ./...
+
+      - name: Build release packages
+        run: |
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            package_dir="server-monitor-api-linux-${arch}"
+            mkdir -p "dist/${package_dir}"
+            CGO_ENABLED=0 GOOS=linux GOARCH="${arch}" go build \
+              -trimpath \
+              -o "dist/${package_dir}/server-monitor-api" \
+              .
+            tar -C dist -czf "dist/${package_dir}.tar.gz" "${package_dir}"
+          done
+          (cd dist && sha256sum server-monitor-api-linux-*.tar.gz > SHA256SUMS)
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: build-${{ github.run_number }}
+        run: |
+          assets=(
+            dist/server-monitor-api-linux-amd64.tar.gz
+            dist/server-monitor-api-linux-arm64.tar.gz
+            dist/SHA256SUMS
+          )
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$TAG" "${assets[@]}" \
+              --target "$GITHUB_SHA" \
+              --title "Build ${GITHUB_RUN_NUMBER}" \
+              --notes "Automated Linux release for commit ${GITHUB_SHA}."
+          fi
