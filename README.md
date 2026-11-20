@@ -21,6 +21,14 @@ go mod download
 go build ./...
 ```
 
+## Automated releases
+
+Every successful push to `main` creates a GitHub Release tagged with the
+GitHub Actions run number (for example, `build-42`). Each release contains
+Linux amd64 and arm64 tarballs with the `server-monitor-api` executable, plus
+a `SHA256SUMS` file for verifying the packages. Download the matching
+architecture from the repository's Releases page before deploying.
+
 ## Run
 
 Start the API with the default host and port. The API requires a token supplied
